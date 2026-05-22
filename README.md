@@ -17,11 +17,11 @@ provision a node, run the experiment, plot the results.
 1. **Node setup** — reserves a Chameleon bare metal node and builds
    [libCacheSim](https://github.com/1a1a11a/libCacheSim), a high-performance
    cache simulator.
-2. **Experiment** — downloads **100 CloudPhysics block-I/O traces** from the
-   open [cacheMon/cache_dataset](https://github.com/cacheMon/cache_dataset)
-   corpus and simulates **LRU, LFU, ARC, LeCaR, and S3-FIFO** on each trace at
-   three cache sizes (0.1%, 1%, 10% of the working set).
-3. **Analysis** — plots the miss-ratio comparison across the 100 traces.
+2. **Experiment** — downloads **100 CloudPhysics block-I/O traces** over HTTP
+   from the [CMU PDL trace mirror](https://ftp.pdl.cmu.edu/pub/datasets/twemcacheWorkload/cacheDatasets/),
+   then simulates **LRU, LFU, ARC, LeCaR, and S3-FIFO** on the **smallest 50
+   traces** (10 at a time) at two cache sizes (1% and 10% of the working set).
+3. **Analysis** — plots the miss-ratio comparison across the traces.
 
 ## Prerequisites
 
@@ -45,14 +45,14 @@ out of the box.
 ## Repository layout
 
 ```
-s3fifo_repro/
+s3fifo-repro/
 ├── Experiment.ipynb         # full pipeline: provision -> run -> plot
 ├── trovi.json               # Trovi artifact metadata
 ├── requirements.txt         # Python deps for the Jupyter side
 ├── scripts/
 │   ├── setup.sh             # build libCacheSim + dependencies on the node
-│   ├── download_traces.sh   # fetch 100 traces from the public S3 corpus
-│   ├── run_experiment.sh    # simulate all 5 algorithms on every trace
+│   ├── download_traces.sh   # fetch traces over HTTP (parallel)
+│   ├── run_experiment.sh    # simulate all 5 algorithms (parallel)
 │   ├── parse_results.py     # raw cachesim output -> results.csv
 │   └── make_sample_data.py  # regenerate the sample dataset
 └── results/
@@ -80,14 +80,26 @@ automatically.
 
 ```bash
 ALGOS="lru,lfu,arc,lecar,s3fifo,fifo,sieve" \
-SIZES="0.001,0.01,0.1" \
+SIZES="0.01,0.1" \
+MAX_TRACES="50" \
+PARALLEL="10" \
 bash scripts/run_experiment.sh
 ```
 
-Use a different trace corpus by passing a dataset prefix to
-`download_traces.sh` (e.g. `2020_twitter`, `2007_msr`); list available
-datasets with
-`aws s3 ls s3://cache-datasets/cache_dataset_oracleGeneral/ --no-sign-request`.
+`MAX_TRACES` picks that many traces, smallest first; `PARALLEL` sets how many
+are simulated concurrently. `download_traces.sh` likewise honors `JOBS` for
+parallel downloads.
+
+Use a different trace corpus by passing an HTTP directory URL as the second
+argument to `download_traces.sh`, e.g.
+
+```bash
+bash scripts/download_traces.sh 100 \
+  https://ftp.pdl.cmu.edu/pub/datasets/twemcacheWorkload/cacheDatasets/msr/
+```
+
+Browse the available datasets at
+<https://ftp.pdl.cmu.edu/pub/datasets/twemcacheWorkload/cacheDatasets/>.
 
 ## Expected result
 

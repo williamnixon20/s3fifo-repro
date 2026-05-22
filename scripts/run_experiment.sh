@@ -2,18 +2,22 @@
 #
 # run_experiment.sh - Run the S3FIFO cache-eviction comparison.
 #
-# For every downloaded trace, simulate each eviction algorithm at each cache
-# size with libCacheSim's `cachesim`, parse the miss ratios into results.csv,
-# and (on Chameleon) upload the CSV to the object store so the Jupyter server
-# can retrieve it.
+# Simulates each eviction algorithm at each cache size with libCacheSim's
+# `cachesim` on the smallest MAX_TRACES traces (shortest first), parses the
+# miss ratios into results.csv, and (on Chameleon) uploads the CSV to the
+# object store so the Jupyter server can retrieve it.
+#
+# Traces are simulated PARALLEL at a time.
 #
 # Usage:
 #   run_experiment.sh [TRACE_DIR]
 #
 # Environment overrides:
-#   CACHESIM  path to the cachesim binary
-#   ALGOS     comma-separated eviction algorithms
-#   SIZES     comma-separated cache sizes as a fraction of the working set
+#   CACHESIM    path to the cachesim binary
+#   ALGOS       comma-separated eviction algorithms
+#   SIZES       comma-separated cache sizes as a fraction of the working set
+#   MAX_TRACES  number of traces to simulate, smallest first (default: 50)
+#   PARALLEL    number of traces simulated concurrently     (default: 10)
 
 set -uo pipefail
 
@@ -22,7 +26,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TRACE_DIR="${1:-$HOME/traces}"
 CACHESIM="${CACHESIM:-$HOME/libCacheSim/_build/bin/cachesim}"
 ALGOS="${ALGOS:-lru,lfu,arc,lecar,s3fifo}"
-SIZES="${SIZES:-0.001,0.01,0.1}"
+SIZES="${SIZES:-0.01,0.1}"
+MAX_TRACES="${MAX_TRACES:-50}"
+PARALLEL="${PARALLEL:-10}"
 TRACE_TYPE="oracleGeneral"
 
 OUT_DIR="./out"
@@ -37,36 +43,53 @@ fi
 rm -rf "$OUT_DIR"
 mkdir -p "$RAW_DIR"
 
-mapfile -t TRACES < <(ls "$TRACE_DIR" 2>/dev/null)
+# Select the smallest MAX_TRACES trace files, ordered shortest-first, so the
+# quickest simulations finish first ('ls -S' sorts by size, '-r' ascending).
+mapfile -t TRACES < <(ls -1Sr "$TRACE_DIR" 2>/dev/null | head -n "$MAX_TRACES")
 N=${#TRACES[@]}
 if [ "$N" -eq 0 ]; then
     echo "ERROR: no traces in $TRACE_DIR. Run scripts/download_traces.sh first." >&2
     exit 1
 fi
+available=$(ls -1 "$TRACE_DIR" 2>/dev/null | wc -l)
 
 IFS=',' read -ra SIZE_ARR <<< "$SIZES"
 
 echo "=============================================="
 echo " S3FIFO reproduction - running experiment"
-echo "   traces      : $N  (in $TRACE_DIR)"
+echo "   traces      : $N  (smallest first, of $available in $TRACE_DIR)"
 echo "   algorithms  : $ALGOS"
 echo "   cache sizes : $SIZES  (fraction of working set)"
+echo "   parallelism : $PARALLEL traces at a time"
 echo "=============================================="
+
+# Simulate one trace at every cache size. Background jobs ('&') inherit this
+# function and the variables / SIZE_ARR below from the parent shell.
+run_trace() {
+    local idx="$1" t="$2"
+    local base="${t%%.*}"   # strip .oracleGeneral.bin.zst -> clean label
+    local s out
+    for s in "${SIZE_ARR[@]}"; do
+        out="${RAW_DIR}/${base}__size_${s}.txt"
+        if ! "$CACHESIM" "${TRACE_DIR}/${t}" "$TRACE_TYPE" "$ALGOS" "$s" \
+                --ignore-obj-size 1 > "$out" 2>&1; then
+            echo "  [${idx}/${N}] WARNING: cachesim failed on ${t} @ size ${s}"
+        fi
+    done
+    echo "  [${idx}/${N}] done ${t}"
+}
 
 start=$(date +%s)
 i=0
 for t in "${TRACES[@]}"; do
     i=$((i + 1))
-    # Strip extensions (e.g. .oracleGeneral.zst) for a clean trace label.
-    base="${t%%.*}"
-    echo "[${i}/${N}] ${t}"
-    for s in "${SIZE_ARR[@]}"; do
-        out="${RAW_DIR}/${base}__size_${s}.txt"
-        "$CACHESIM" "${TRACE_DIR}/${t}" "$TRACE_TYPE" "$ALGOS" "$s" \
-            --ignore-obj-size 1 > "$out" 2>&1 \
-            || echo "   WARNING: cachesim failed on ${t} @ size ${s}"
+    run_trace "$i" "$t" &
+    # Throttle: keep at most PARALLEL simulations running at once.
+    while [ "$(jobs -rp | wc -l)" -ge "$PARALLEL" ]; do
+        wait -n
     done
 done
+wait  # let the final batch finish
 end=$(date +%s)
 echo "Simulations finished in $((end - start))s."
 

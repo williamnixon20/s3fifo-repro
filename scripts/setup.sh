@@ -18,7 +18,7 @@ sudo apt-get install -yqq \
     build-essential cmake ninja-build pkg-config git unzip \
     libglib2.0-dev libzstd-dev \
     google-perftools libgoogle-perftools-dev \
-    python3-pip python3-swiftclient awscli
+    python3-pip python3-swiftclient wget curl
 
 pip3 install --quiet --upgrade pandas matplotlib
 
