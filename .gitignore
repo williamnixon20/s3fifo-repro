@@ -1,0 +1,14 @@
+# Experiment outputs and downloaded data
+out/
+traces/
+*.oracleGeneral
+*.zst
+
+# Python
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Editors
+.vscode/
+.DS_Store

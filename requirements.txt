@@ -1,0 +1,6 @@
+# Python dependencies for the Jupyter (control) side of the artifact.
+# Chameleon's JupyterHub already provides python-chi; listed here for
+# off-platform use.
+python-chi
+pandas
+matplotlib

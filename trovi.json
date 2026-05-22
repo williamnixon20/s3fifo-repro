@@ -1,0 +1,36 @@
+{
+  "title": "Reproducing S3-FIFO: FIFO Queues Are All You Need for Cache Evictions",
+  "short_description": "A Chameleon bare metal artifact that reproduces the SOSP'23 S3-FIFO cache-eviction result by simulating LRU, LFU, ARC, LeCaR, and S3-FIFO on 100 CloudPhysics traces with libCacheSim.",
+  "long_description": "This artifact provisions a Chameleon bare metal node, builds the libCacheSim cache simulator, downloads 100 CloudPhysics block-I/O traces from the open cacheMon/cache_dataset corpus, and simulates five cache-eviction algorithms (LRU, LFU, ARC, LeCaR, S3-FIFO) at three cache sizes. The Analysis notebook plots the miss-ratio comparison, reproducing the central finding of the SOSP'23 paper 'FIFO queues are all you need for cache evictions' (Yang et al.): S3-FIFO achieves lower miss ratios than both classic and state-of-the-art eviction policies.",
+  "tags": [
+    "caching",
+    "cache-eviction",
+    "S3-FIFO",
+    "libCacheSim",
+    "reproducibility",
+    "systems",
+    "SOSP23"
+  ],
+  "authors": [
+    {
+      "full_name": "Artifact Author",
+      "affiliation": "Your Institution",
+      "email": "you@example.edu"
+    }
+  ],
+  "reproducibility": {
+    "enable_requests": true,
+    "access_hours": 4
+  },
+  "linked_projects": [],
+  "structure": {
+    "experiment_notebook": "Experiment.ipynb",
+    "scripts": "scripts/"
+  },
+  "based_on": "https://github.com/ChameleonCloud/bare_metal_experiment_pattern",
+  "references": [
+    "https://github.com/Thesys-lab/sosp23-s3fifo",
+    "https://github.com/1a1a11a/libCacheSim",
+    "https://github.com/cacheMon/cache_dataset"
+  ]
+}
