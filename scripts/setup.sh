@@ -20,7 +20,7 @@ sudo apt-get install -yqq \
     google-perftools libgoogle-perftools-dev \
     python3-pip python3-swiftclient wget curl
 
-pip3 install --quiet --upgrade pandas matplotlib
+pip3 install --quiet --upgrade pandas matplotlib seaborn
 
 # --- Build libCacheSim --------------------------------------------------
 cd "$HOME"

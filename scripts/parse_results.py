@@ -23,6 +23,26 @@ LINE_RE = re.compile(
 )
 FNAME_RE = re.compile(r"^(?P<trace>.+)__size_(?P<frac>[\d.]+)\.txt$")
 
+# cachesim reports a cache's *full* name, which may carry tuning parameters,
+# e.g. S3FIFO is reported as "S3FIFO-0.1000-2" (small-queue ratio + threshold)
+# and LeCaR may appear as "LeCaR-0.45-...". Normalize such names to a plain
+# canonical label so Analysis.ipynb (ALGOS = [...,"s3fifo"]) matches them.
+# Longest-first so e.g. "wtinylfu" wins over "tinylfu" / "lfu".
+_KNOWN_ALGOS = sorted(
+    ["wtinylfu", "tinylfu", "s3fifo", "sieve", "lecar", "lhd", "qdlp",
+     "twoq", "slru", "clock", "belady", "lru", "lfu", "arc", "fifo"],
+    key=len, reverse=True,
+)
+
+
+def canonical_algo(name: str) -> str:
+    """Map a cachesim cache name (possibly with parameters) to a plain label."""
+    base = name.strip().lower()
+    for algo in _KNOWN_ALGOS:
+        if base == algo or base.startswith(algo + "-") or base.startswith(algo + "_"):
+            return algo
+    return base
+
 
 def main() -> int:
     if len(sys.argv) != 3:
@@ -48,7 +68,7 @@ def main() -> int:
                 rows.append(
                     {
                         "trace": trace,
-                        "algo": algo.lower(),
+                        "algo": canonical_algo(algo),
                         "cache_fraction": cache_fraction,
                         "num_req": int(nreq),
                         "miss_ratio": float(mr),
